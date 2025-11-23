@@ -14,6 +14,26 @@
             <p class="subtitle">Stay organized, get things done</p>
         </header>
 
+        <!-- Summary Stats Banner -->
+        <div class="summary-banner" id="summary-banner">
+            <div class="summary-item">
+                <span class="summary-label">Total Effort</span>
+                <span class="summary-value" id="total-effort">0h</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">Completed</span>
+                <span class="summary-value" id="completed-effort">0h</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">Remaining</span>
+                <span class="summary-value" id="remaining-effort">0h</span>
+            </div>
+            <div class="summary-item warning" id="overdue-container">
+                <span class="summary-label">Overdue</span>
+                <span class="summary-value" id="overdue-count">0</span>
+            </div>
+        </div>
+
         <div class="add-todo-section">
             <form id="add-todo-form">
                 <div class="input-group">
@@ -24,11 +44,30 @@
                         autocomplete="off"
                         required
                     >
-                    <select id="priority-select">
+                </div>
+                <div class="input-group-row">
+                    <select id="priority-select" title="Priority">
                         <option value="low">🟢 Low</option>
                         <option value="medium" selected>🟡 Medium</option>
                         <option value="high">🔴 High</option>
                     </select>
+                    <select id="effort-select" title="Estimated Effort">
+                        <option value="">⏱️ Effort</option>
+                        <option value="0.5">30 min</option>
+                        <option value="1">1 hour</option>
+                        <option value="2">2 hours</option>
+                        <option value="4">4 hours</option>
+                        <option value="8">1 day</option>
+                        <option value="16">2 days</option>
+                        <option value="24">3 days</option>
+                        <option value="40">1 week</option>
+                    </select>
+                    <input
+                        type="date"
+                        id="target-date-input"
+                        title="Target completion date"
+                        class="date-input"
+                    >
                     <button type="submit" class="btn btn-primary">Add Task</button>
                 </div>
             </form>
@@ -40,6 +79,9 @@
             <button class="filter-btn" data-filter="in_progress">In Progress</button>
             <button class="filter-btn" data-filter="on_hold">On Hold</button>
             <button class="filter-btn" data-filter="completed">Completed</button>
+            <span class="filter-divider"></span>
+            <button class="filter-btn filter-warning" data-filter="overdue">⚠️ Overdue</button>
+            <button class="filter-btn filter-alert" data-filter="due_soon">🔔 Due Soon</button>
         </div>
 
         <div class="todo-list-container">

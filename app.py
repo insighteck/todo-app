@@ -2,12 +2,13 @@
 """
 Todo List Web Application
 A Flask-based web UI for managing your daily tasks.
+Features: priority, status, estimated effort, and target date tracking.
 """
 
 from flask import Flask, render_template, request, jsonify
 import json
 import os
-from datetime import datetime
+from datetime import datetime, date
 from pathlib import Path
 
 app = Flask(__name__)
@@ -45,13 +46,53 @@ def index():
 
 @app.route("/api/todos", methods=["GET"])
 def get_todos():
-    """Get all todos."""
+    """Get all todos with computed target date info."""
     todos = load_todos()
+    # Add computed fields for each todo
+    for todo in todos:
+        target_date = todo.get("target_date", "")
+        status = todo.get("status", "pending")
+        todo["days_until_target"] = calculate_days_until_target(target_date)
+        todo["target_status"] = get_target_status(target_date, status)
     return jsonify(todos)
 
 
 # Valid status values
 VALID_STATUSES = ["pending", "in_progress", "on_hold", "completed"]
+
+# Valid effort values (in hours)
+VALID_EFFORTS = ["0.5", "1", "2", "4", "8", "16", "24", "40"]
+
+
+def calculate_days_until_target(target_date_str):
+    """Calculate days remaining until target date."""
+    if not target_date_str:
+        return None
+    try:
+        target = datetime.strptime(target_date_str, "%Y-%m-%d").date()
+        today = date.today()
+        delta = (target - today).days
+        return delta
+    except (ValueError, TypeError):
+        return None
+
+
+def get_target_status(target_date_str, status):
+    """Get status indicator based on target date proximity."""
+    if status == "completed":
+        return "completed"
+
+    days = calculate_days_until_target(target_date_str)
+    if days is None:
+        return "no_target"
+    elif days < 0:
+        return "overdue"
+    elif days == 0:
+        return "due_today"
+    elif days <= 2:
+        return "due_soon"
+    else:
+        return "on_track"
 
 
 @app.route("/api/todos", methods=["POST"])
@@ -64,14 +105,24 @@ def add_todo():
 
     todos = load_todos()
 
+    # Parse effort as float for calculations, store as string
+    effort = data.get("effort", "")
+    target_date = data.get("target_date", "")
+
     todo = {
         "id": get_next_id(todos),
         "task": data["task"],
         "priority": data.get("priority", "medium"),
         "status": "pending",
+        "effort": effort,  # Estimated effort in hours
+        "target_date": target_date,  # Target completion date (YYYY-MM-DD)
         "created_at": datetime.now().isoformat(),
         "completed_at": None
     }
+
+    # Add computed fields
+    todo["days_until_target"] = calculate_days_until_target(target_date)
+    todo["target_status"] = get_target_status(target_date, "pending")
 
     todos.append(todo)
     save_todos(todos)
@@ -81,7 +132,7 @@ def add_todo():
 
 @app.route("/api/todos/<int:todo_id>", methods=["PUT"])
 def update_todo(todo_id):
-    """Update a todo (change status, edit task, or priority)."""
+    """Update a todo (change status, edit task, priority, effort, or target_date)."""
     data = request.get_json()
     todos = load_todos()
 
@@ -99,6 +150,16 @@ def update_todo(todo_id):
                 todo["task"] = data["task"]
             if "priority" in data:
                 todo["priority"] = data["priority"]
+            if "effort" in data:
+                todo["effort"] = data["effort"]
+            if "target_date" in data:
+                todo["target_date"] = data["target_date"]
+
+            # Update computed fields
+            target_date = todo.get("target_date", "")
+            status = todo.get("status", "pending")
+            todo["days_until_target"] = calculate_days_until_target(target_date)
+            todo["target_status"] = get_target_status(target_date, status)
 
             save_todos(todos)
             return jsonify(todo)
@@ -135,6 +196,54 @@ def clear_completed():
 def get_statuses():
     """Get all valid statuses."""
     return jsonify(VALID_STATUSES)
+
+
+@app.route("/api/efforts", methods=["GET"])
+def get_efforts():
+    """Get all valid effort values in hours."""
+    return jsonify(VALID_EFFORTS)
+
+
+@app.route("/api/summary", methods=["GET"])
+def get_summary():
+    """Get summary statistics including effort tracking."""
+    todos = load_todos()
+
+    total_effort = 0
+    completed_effort = 0
+    overdue_count = 0
+    due_soon_count = 0
+
+    for todo in todos:
+        effort = todo.get("effort", "")
+        if effort:
+            try:
+                effort_hours = float(effort)
+                total_effort += effort_hours
+                if todo.get("status") == "completed":
+                    completed_effort += effort_hours
+            except ValueError:
+                pass
+
+        # Calculate target date status
+        target_date = todo.get("target_date", "")
+        status = todo.get("status", "pending")
+        target_status = get_target_status(target_date, status)
+
+        if target_status == "overdue":
+            overdue_count += 1
+        elif target_status in ["due_today", "due_soon"]:
+            due_soon_count += 1
+
+    return jsonify({
+        "total_tasks": len(todos),
+        "completed_tasks": len([t for t in todos if t.get("status") == "completed"]),
+        "total_effort_hours": total_effort,
+        "completed_effort_hours": completed_effort,
+        "remaining_effort_hours": total_effort - completed_effort,
+        "overdue_count": overdue_count,
+        "due_soon_count": due_soon_count
+    })
 
 
 if __name__ == "__main__":
